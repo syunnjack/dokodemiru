@@ -1,0 +1,74 @@
+name: Refresh data
+
+# TMDB から作品と配信先を取り直して、変化があれば commit する。
+#
+# **配信状況は頻繁に変わる。** 週1回では古くなるので、毎日取り直す。
+# 1作品ごとに配信先を問い合わせるため、件数を増やすと時間がかかる。
+
+on:
+  schedule:
+    - cron: '0 20 * * *'   # 05:00 JST
+  workflow_dispatch:
+    inputs:
+      pages:
+        description: '取得するページ数（1ページ20件。映画とテレビでそれぞれ）'
+        type: string
+        required: false
+
+permissions:
+  contents: write
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    outputs:
+      changed: ${{ steps.commit.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 24
+
+      - name: TMDB から取り直す
+        env:
+          TMDB_TOKEN: ${{ secrets.TMDB_TOKEN }}
+          PAGES: ${{ inputs.pages }}
+        run: python scripts/fetch-titles.py public/data/titles.json
+
+      - name: ページを生成する
+        run: node scripts/build-site.mjs
+
+      - name: 変化があれば commit する
+        id: commit
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add public/data/titles.json
+          if git diff --cached --quiet; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+            echo "データに変化はありませんでした。"
+            exit 0
+          fi
+          git commit -m "配信状況を取り直す（TMDB）"
+          # build-site.mjs は commit しないファイルも書き換えるため、
+          # そのままだと rebase が「未コミットの変更がある」と拒む。
+          git pull --rebase --autostash origin main
+          git push
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+
+  # bot の push では deploy が起動しないため、ここから明示的に呼ぶ。
+  deploy:
+    needs: refresh
+    if: needs.refresh.outputs.changed == 'true'
+    uses: ./.github/workflows/deploy.yml
+    # **これが無いと Secret が渡らない。** 再利用ワークフローは呼び出し元の
+    # Secret を自動では受け取らない。
+    secrets: inherit
+    permissions:
+      contents: read
+      pages: write
+      id-token: write

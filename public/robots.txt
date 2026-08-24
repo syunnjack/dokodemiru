@@ -1,0 +1,18 @@
+User-agent: *
+Allow: /
+
+# 生成AIのクローラーにも読ませる。載せているのは TMDB が公開している
+# 情報だけで、隠す理由がない。
+User-agent: GPTBot
+Allow: /
+
+User-agent: ClaudeBot
+Allow: /
+
+User-agent: PerplexityBot
+Allow: /
+
+User-agent: Google-Extended
+Allow: /
+
+Sitemap: https://dokodemiru.jp/sitemap.xml

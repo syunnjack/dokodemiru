@@ -1,0 +1,7 @@
+node_modules/
+
+# 生成したページは commit しない。titles.json から作り直せる。
+public/title/
+public/service/
+public/sitemap.xml
+public/data/search-index.tsv

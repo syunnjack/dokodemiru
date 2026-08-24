@@ -1,0 +1,133 @@
+<!doctype html>
+<html lang="ja">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>どこで見る？｜映画・ドラマがどの配信サービスで見られるかを調べる</title>
+    <meta
+      name="description"
+      content="映画やテレビ番組が、日本のどの配信サービスで見られるかを調べられます。定額見放題・無料・レンタル・購入の別まで分かります。データは TMDB の公開情報をそのまま掲載しています。"
+    />
+    <link rel="canonical" href="https://dokodemiru.jp/" />
+    <meta property="og:type" content="website" />
+    <meta property="og:locale" content="ja_JP" />
+    <meta property="og:site_name" content="どこで見る？" />
+    <meta property="og:title" content="どこで見る？" />
+    <meta property="og:description" content="映画やテレビ番組が、日本のどの配信サービスで見られるかを調べられます。" />
+    <meta property="og:url" content="https://dokodemiru.jp/" />
+    <script type="application/ld+json">
+      {
+        "@context": "https://schema.org",
+        "@type": "WebSite",
+        "name": "どこで見る？",
+        "alternateName": "dokodemiru.jp",
+        "url": "https://dokodemiru.jp/",
+        "inLanguage": "ja",
+        "description": "映画やテレビ番組が、日本のどの配信サービスで見られるかを調べられるサイトです。",
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://dokodemiru.jp/?q={search_term_string}",
+          "query-input": "required name=search_term_string"
+        }
+      }
+    </script>
+    <link rel="stylesheet" href="/assets/page.css" />
+  </head>
+  <body>
+    <div class="wrap">
+      <header class="site-head"><a class="site-name" href="/">どこで見る？</a></header>
+
+      <h1>その作品、どこで見られる？</h1>
+      <p class="reading">
+        映画やテレビ番組が、日本のどの配信サービスで見られるかを調べられます。
+        定額見放題・無料・レンタル・購入の別まで分かります。
+        データは <a href="https://www.themoviedb.org/" target="_blank" rel="noopener">TMDB</a> が公開している情報をそのまま載せていて、
+        当サイトによる評価やおすすめは含みません。
+      </p>
+
+      <form class="search" role="search" onsubmit="return false">
+        <label class="visually-hidden" for="q">作品名で探す</label>
+        <input id="q" type="search" placeholder="作品名を入力（例: ゴジラ）" autocomplete="off" />
+      </form>
+
+      <div class="results" id="results">
+        <p class="note">作品名の一部を入れると、候補が出ます。</p>
+      </div>
+
+      <p class="reading">
+        配信サービスから探すこともできます。<a href="/service/">配信サービス一覧</a>をご覧ください。
+      </p>
+
+      <footer>
+        <nav class="site-nav">
+          <a href="/">どこで見る？ トップ</a>
+          <a href="/service/">配信サービス一覧</a>
+          <a href="/about/">このサイトについて</a>
+          <a href="/privacy/">プライバシーポリシー</a>
+        </nav>
+        <p>掲載内容の訂正・削除のご依頼は <a href="mailto:info@dokodemiru.jp">info@dokodemiru.jp</a> へご連絡ください。</p>
+        <p class="credit">This product uses the TMDB API but is not endorsed or certified by TMDB.</p>
+        <p class="credit">配信状況のデータは JustWatch より提供されています。</p>
+      </footer>
+    </div>
+
+    <script>
+      // 検索用の索引は、入力があったときだけ読み込む。
+      (function () {
+        const input = document.getElementById('q')
+        const box = document.getElementById('results')
+        let index = null
+        let loading = false
+
+        const KIND = { movie: '映画', tv: 'テレビ番組' }
+
+        function normalise(value) {
+          return String(value || '')
+            .normalize('NFKC')
+            .replace(/[ァ-ヶ]/g, (c) => String.fromCharCode(c.charCodeAt(0) - 0x60))
+            .replace(/[\s　・]/g, '')
+            .toLowerCase()
+        }
+
+        function load() {
+          if (index || loading) return Promise.resolve()
+          loading = true
+          return fetch('/data/search-index.tsv')
+            .then((r) => r.text())
+            .then((text) => {
+              index = text.split('\n').filter(Boolean).map((line) => {
+                const [title, original, slug, kind] = line.split('\t')
+                return { title, original, slug, kind, key: normalise(title) + normalise(original) }
+              })
+            })
+            .catch(() => { index = [] })
+            .finally(() => { loading = false })
+        }
+
+        function render() {
+          const keyword = normalise(input.value)
+          if (!keyword) {
+            box.innerHTML = '<p class="note">作品名の一部を入れると、候補が出ます。</p>'
+            return
+          }
+          if (!index) {
+            box.innerHTML = '<p class="note">読み込んでいます…</p>'
+            return
+          }
+          const rows = index.filter((r) => r.key.includes(keyword)).slice(0, 60)
+          if (!rows.length) {
+            box.innerHTML = '<p class="note">見つかりませんでした。別の言い方でお試しください。</p>'
+            return
+          }
+          box.innerHTML = '<ul class="title-list">' + rows.map((r) =>
+            '<li><a href="/title/' + r.slug + '/">' + r.title.replace(/[<>&]/g, '') + '</a>'
+            + '<span>' + (KIND[r.kind] || '') + '</span></li>').join('') + '</ul>'
+        }
+
+        input.addEventListener('input', () => { load().then(render); render() })
+        const initial = new URLSearchParams(location.search).get('q')
+        if (initial) { input.value = initial; load().then(render) }
+      })()
+    </script>
+  </body>
+</html>
