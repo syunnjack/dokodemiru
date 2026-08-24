@@ -5,3 +5,6 @@ public/title/
 public/service/
 public/sitemap.xml
 public/data/search-index.tsv
+
+# Python の中間ファイル
+scripts/__pycache__/
